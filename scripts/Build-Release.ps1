@@ -38,6 +38,7 @@ if (!(Test-Path -LiteralPath $sourceExecutable -PathType Leaf)) { throw 'Build d
 
 $name = "Mediadeka-$version-preview-windows-x64"
 $package = (New-Item -ItemType Directory -Force -Path (Join-Path $output $name)).FullName
+$libmpv = & (Join-Path $PSScriptRoot 'Get-Libmpv.ps1') -OutputDirectory $package
 New-Item -ItemType Directory -Force -Path (Join-Path $package 'licenses') | Out-Null
 $files = [ordered]@{
     'mediadeka.exe' = $sourceExecutable
@@ -61,7 +62,9 @@ $buildInfo = Join-Path $package 'build-info.json'
     rustc = $compiler
     cargo_lock_sha256 = (Get-FileHash -LiteralPath (Join-Path $repository 'app2/Cargo.lock')).Hash.ToLowerInvariant()
     executable_sha256 = $exeHash
-    includes_libmpv = $false
+    includes_libmpv = $true
+    libmpv_sha256 = $libmpv.Sha256
+    libmpv_source_url = $libmpv.SourceUrl
 } | ConvertTo-Json | Set-Content -LiteralPath $buildInfo -Encoding utf8
 
 $zipPath = Join-Path $output "$name.zip"
@@ -69,7 +72,7 @@ $temporary = "$zipPath.$([Guid]::NewGuid()).tmp"
 try {
     $archive = [IO.Compression.ZipFile]::Open($temporary, [IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach ($entry in @($files.Keys) + 'build-info.json') {
+        foreach ($entry in @($files.Keys) + @('libmpv-2.dll', 'build-info.json')) {
             [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
                 $archive, (Join-Path $package $entry), $entry, [IO.Compression.CompressionLevel]::Optimal
             )

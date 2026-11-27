@@ -18,10 +18,9 @@ Mediadeka — музыкальный плеер для Windows x64. Слушай
 ## Как запустить
 
 1. Скачайте ZIP для Windows x64 со [страницы выпусков](https://github.com/starsinc1708/mediadeka/releases), сверьте его SHA-256 по `SHA256SUMS.txt` и распакуйте.
-2. Извлеките `libmpv-2.dll` и положите её рядом с `mediadeka.exe`. [Проверенный пакет libmpv для Windows x64](https://github.com/zhongfly/mpv-winbuild/releases/download/2026-11-19-b7339522cd/mpv-dev-lgpl-x86_64-20261119-git-b7339522cd.7z)
-3. Запустите `mediadeka.exe`. Для знакомства с плеером выберите «Гостевой вход».
+2. Запустите `mediadeka.exe` из распакованной папки. Для знакомства с плеером выберите «Гостевой вход».
 
-SHA-256 проверенной `libmpv-2.dll` — `88c13c8a806195706918fc1c5ecfbcd466e3590a527f567bf479ccd081903dd0`. Для входа в SoundCloud через встроенное окно нужен Microsoft Edge WebView2 Runtime.
+В ZIP уже есть `libmpv-2.dll` для воспроизведения. Для входа в SoundCloud через встроенное окно нужен Microsoft Edge WebView2 Runtime.
 
 Первый выпуск рассчитан на Windows x64. [Планы для Linux, macOS, Android и Android TV](ROADMAP.md#выпуски-на-других-платформах)
 
@@ -38,7 +37,11 @@ cargo build --locked --features fluid-glass-default
 Pop-Location
 ```
 
-Положите Windows x64 `libmpv-2.dll` рядом с `app2/target/debug/mediadeka.exe` для воспроизведения.
+Для воспроизведения в debug-сборке скачайте тот же libmpv в папку с EXE. Запустите команду из корня репозитория.
+
+```powershell
+pwsh -File scripts/Get-Libmpv.ps1 -OutputDirectory app2/target/debug
+```
 
 Профиль по умолчанию хранится в `%LOCALAPPDATA%/Mediadeka/app2/`. Для проверки на новом профиле задайте `MEDIADEKA_PROFILE_DIR` в текущем процессе.
 
@@ -48,7 +51,7 @@ Pop-Location
 pwsh -File scripts/Build-Release.ps1
 ```
 
-Скрипт компилирует оптимизированную сборку с `--locked` и `fluid-glass-default`. В `dist/` появляются ZIP с EXE и контрольные суммы. DLL поставляется отдельно. Файл `build-info.json` внутри ZIP указывает исходный коммит, версию Rust и SHA-256 исполняемого файла.
+Скрипт компилирует оптимизированную сборку с `--locked` и `fluid-glass-default`, скачивает закреплённую сборку libmpv и проверяет её SHA-256. В `dist/` появляются ZIP с `mediadeka.exe` и `libmpv-2.dll` и файл `SHA256SUMS.txt`. Файл `build-info.json` внутри ZIP указывает исходный коммит, версию Rust, хеши EXE и DLL и источник libmpv.
 
 ## Как внести вклад
 
