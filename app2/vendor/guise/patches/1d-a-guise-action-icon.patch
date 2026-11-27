@@ -1,0 +1,135 @@
+--- a/app2/vendor/guise/src/actionicon.rs
++++ b/app2/vendor/guise/src/actionicon.rs
+@@ -1,7 +1,12 @@
+ //! `ActionIcon` — a square icon-only button.
+ 
++use std::rc::Rc;
++
+ use gpui::prelude::*;
+-use gpui::{div, px, App, ClickEvent, ElementId, IntoElement, SharedString, Window};
++use gpui::{
++  div, hsla, px, AccessibleAction, App, ClickEvent, ElementId, IntoElement, Pixels, Role,
++  SharedString, Window,
++};
+ 
+ use crate::devtools::Probed;
+ use crate::icon::Glyph;
+@@ -9,6 +14,9 @@
+ use crate::style::{icon_size, surface, ColorValue, Variant};
+ use crate::theme::{theme, ColorName, Size};
+ 
++/// A click handler shared by the pointer and the accessibility Click action.
++type SharedClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
++
+ /// A compact, square icon button.
+ #[derive(IntoElement)]
+ pub struct ActionIcon {
+@@ -21,6 +29,9 @@
+   radius: Option<Size>,
+   disabled: bool,
+   on_click: Option<ClickHandler>,
++  glyph_size: Option<Pixels>,
++  tab_order: isize,
++  description: Option<SharedString>,
+ }
+ 
+ impl ActionIcon {
+@@ -35,10 +46,14 @@
+       radius: None,
+       disabled: false,
+       on_click: None,
++      glyph_size: None,
++      tab_order: 0,
++      description: None,
+     }
+   }
+ 
+   /// Give the icon-only control a human-readable name and hover tooltip.
++  /// Screen readers announce it as the button's name.
+   pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+     self.label = Some(label.into());
+     self
+@@ -69,6 +84,25 @@
+     self
+   }
+ 
++  /// Draw the glyph at an exact size instead of half the button.
++  pub fn glyph_size(mut self, size: Pixels) -> Self {
++    self.glyph_size = Some(size);
++    self
++  }
++
++  /// Position in the window tab order. `0` keeps document order.
++  pub fn tab_order(mut self, order: isize) -> Self {
++    self.tab_order = order;
++    self
++  }
++
++  /// Extra context screen readers announce after the name, such as why the
++  /// control is unavailable.
++  pub fn accessible_description(mut self, description: impl Into<SharedString>) -> Self {
++    self.description = Some(description.into());
++    self
++  }
++
+   pub fn on_click(
+     mut self,
+     handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+@@ -84,10 +118,15 @@
+     let s = surface(t, self.color, self.variant);
+     let dim = icon_size(self.size);
+     let radius = t.radius(self.radius.unwrap_or(t.default_radius));
+-    let focus = t.primary().hsla();
++    // A filled control already wears the accent, so the keyboard ring uses
++    // the text color to stay visible on every variant.
++    let focus = t.text().hsla();
++    let automation_id = self.id.to_string();
+ 
+     let mut el = div()
+       .id(self.id)
++      .accessibility_id(automation_id)
++      .role(Role::Button)
+       .w(px(dim))
+       .h(px(dim))
+       .flex()
+@@ -96,13 +135,19 @@
+       .rounded(px(radius))
+       .bg(s.bg)
+       .text_color(s.fg)
+-      .text_size(px(dim * 0.5))
++      .text_size(self.glyph_size.unwrap_or_else(|| px(dim * 0.5)))
+       .child(self.icon)
+-      .tab_index(0)
+-      .focus(move |style| style.border_2().border_color(focus))
++      .tab_index(self.tab_order)
++      // A constant 1px border keeps the keyboard ring from shifting layout.
++      .border_1()
++      .border_color(s.border.unwrap_or(hsla(0.0, 0.0, 0.0, 0.0)))
++      .focus_visible(move |style| style.border_color(focus))
+       .on_key_down(crate::input::handle_tab);
+-    if let Some(border) = s.border {
+-      el = el.border_1().border_color(border);
++    if let Some(label) = &self.label {
++      el = el.aria_label(label.clone());
++    }
++    if let Some(description) = self.description {
++      el = el.aria_description(description);
+     }
+ 
+     let label = self.label;
+@@ -112,7 +157,14 @@
+       let hover_bg = s.bg_hover;
+       el = el.hover(move |st| st.bg(hover_bg));
+       if let Some(handler) = self.on_click {
+-        el = el.on_click(handler);
++        // Screen readers press the control through the accessibility Click action.
++        let handler: SharedClickHandler = Rc::from(handler);
++        let accessible = Rc::clone(&handler);
++        el = el
++          .on_click(move |event, window, cx| handler(event, window, cx))
++          .on_a11y_action(AccessibleAction::Click, move |_, window, cx| {
++            accessible(&ClickEvent::default(), window, cx)
++          });
+       }
+       el
+     };

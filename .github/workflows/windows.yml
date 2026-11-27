@@ -1,0 +1,68 @@
+name: Windows x64
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUST_VERSION: '1.100.0'
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  check:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: app2
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          rustup toolchain install $env:RUST_VERSION --profile minimal --component rustfmt --component clippy
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set $env:RUST_VERSION
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Lint
+        run: cargo clippy --locked --features capture --all-targets -- -D warnings
+      - name: Library tests
+        run: cargo test --locked --features capture --lib
+      - name: Build Windows app
+        run: cargo build --locked --features fluid-glass-default
+
+  candidate:
+    if: github.event_name == 'workflow_dispatch'
+    needs: check
+    runs-on: windows-2025
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_VERSION --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set $env:RUST_VERSION
+      - name: Create Windows package
+        shell: pwsh
+        run: ./scripts/Build-Release.ps1 -RequireClean
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mediadeka-windows-x64-candidate
+          path: |
+            dist/Mediadeka-*-preview-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,216 @@
+--- a/app2/vendor/guise/src/chip.rs
++++ b/app2/vendor/guise/src/chip.rs
+@@ -1,7 +1,12 @@
+ //! `Chip` — a selectable pill (controlled).
+ 
++use std::rc::Rc;
++
+ use gpui::prelude::*;
+-use gpui::{div, px, App, ClickEvent, ElementId, FontWeight, IntoElement, SharedString, Window};
++use gpui::{
++  div, px, AccessibleAction, AnyElement, App, ClickEvent, ElementId, FontWeight, IntoElement, Role,
++  SharedString, Toggled, Window,
++};
+ 
+ use crate::devtools::Probed;
+ use crate::input::ClickHandler;
+@@ -9,6 +14,9 @@
+ use crate::style::ColorValue;
+ use crate::theme::{theme, Size};
+ 
++/// A click handler shared by the pointer and the accessibility Click action.
++type SharedClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
++
+ /// A selectable chip. Controlled: pass `checked` and a
+ /// change handler via `cx.listener`, or two-way bind with [`Chip::bind`].
+ #[derive(IntoElement)]
+@@ -20,6 +28,10 @@
+   size: Size,
+   binding: Option<Binding<bool>>,
+   on_change: Option<ClickHandler>,
++  left_section: Option<AnyElement>,
++  accessible_name: Option<SharedString>,
++  tab_order: isize,
++  tab: bool,
+ }
+ 
+ impl Chip {
+@@ -32,6 +44,10 @@
+       size: Size::Md,
+       binding: None,
+       on_change: None,
++      left_section: None,
++      accessible_name: None,
++      tab_order: 0,
++      tab: false,
+     }
+   }
+ 
+@@ -50,6 +66,31 @@
+     self
+   }
+ 
++  /// Content shown before the label (e.g. an icon or a brand mark).
++  pub fn left_section(mut self, section: impl IntoElement) -> Self {
++    self.left_section = Some(section.into_any_element());
++    self
++  }
++
++  /// Name announced by screen readers when it differs from the visible label.
++  pub fn accessible_name(mut self, name: impl Into<SharedString>) -> Self {
++    self.accessible_name = Some(name.into());
++    self
++  }
++
++  /// Position in the window tab order. `0` keeps document order.
++  pub fn tab_order(mut self, order: isize) -> Self {
++    self.tab_order = order;
++    self
++  }
++
++  /// Present the chip as one tab of a tab list: screen readers hear a
++  /// selected tab instead of a checkbox, and no check mark is drawn.
++  pub fn as_tab(mut self) -> Self {
++    self.tab = true;
++    self
++  }
++
+   /// Two-way bind the checked state. Overrides `checked`; clicks write the
+   /// toggled value back through the binding, then run any `on_change`.
+   pub fn bind(mut self, binding: Binding<bool>) -> Self {
+@@ -89,9 +130,16 @@
+       (t.surface().hsla(), t.text().hsla(), t.border().hsla())
+     };
+     let hover_bg = t.surface_hover().hsla();
++    // A checked chip already wears the accent border, so the keyboard ring
++    // uses the text color to stay visible in both states.
++    let focus = t.text().hsla();
++    let automation_id = self.id.to_string();
++    let name = self.accessible_name.unwrap_or_else(|| self.label.clone());
+ 
+     let mut el = div()
+       .id(self.id)
++      .accessibility_id(automation_id)
++      .aria_label(name)
+       .flex()
+       .items_center()
+       .gap(px(6.0))
+@@ -104,17 +152,31 @@
+       .text_color(fg)
+       .text_size(px(font))
+       .font_weight(FontWeight::MEDIUM);
++    el = if self.tab {
++      el.role(Role::Tab).aria_selected(checked)
++    } else {
++      el.role(Role::CheckBox).aria_toggled(if checked {
++        Toggled::True
++      } else {
++        Toggled::False
++      })
++    };
+     if checked {
+-      el = el.child(SharedString::new_static("\u{2713}"));
++      if !self.tab {
++        el = el.child(SharedString::new_static("\u{2713}"));
++      }
+     } else {
+       el = el.hover(move |s| s.bg(hover_bg));
+     }
++    if let Some(left) = self.left_section {
++      el = el.child(left);
++    }
+     el = el.child(self.label);
+     if self.binding.is_some() || self.on_change.is_some() {
+       let binding = self.binding;
+       let handler = self.on_change;
+       let next = !checked;
+-      el = el.on_click(move |ev, window, cx| {
++      let toggle: SharedClickHandler = Rc::new(move |ev, window, cx| {
+         if let Some(binding) = &binding {
+           binding.set(cx, next);
+         }
+@@ -122,6 +184,16 @@
+           handler(ev, window, cx);
+         }
+       });
++      let accessible = Rc::clone(&toggle);
++      el = el
++        .tab_index(self.tab_order)
++        .focus_visible(move |style| style.border_color(focus))
++        .on_key_down(crate::input::handle_tab)
++        .on_click(move |ev, window, cx| toggle(ev, window, cx))
++        // Screen readers press the chip through the accessibility Click action.
++        .on_a11y_action(AccessibleAction::Click, move |_, window, cx| {
++          accessible(&ClickEvent::default(), window, cx)
++        });
+     }
+     el.probe("Chip")
+       .attr("size", self.size.label())
+--- a/app2/vendor/guise/src/icon/mod.rs
++++ b/app2/vendor/guise/src/icon/mod.rs
+@@ -16,10 +16,11 @@
+ use std::sync::atomic::{AtomicBool, Ordering};
+ 
+ use gpui::prelude::*;
+-use gpui::{div, px, App, IntoElement, SharedString, Window};
++use gpui::{div, px, App, IntoElement, Pixels, SharedString, Window};
+ 
+ use crate::devtools::Probed;
+-use crate::theme::{theme, ColorName, Size};
++use crate::style::ColorValue;
++use crate::theme::{theme, Size};
+ 
+ /// The family name baked into the embedded Lucide font.
+ pub(crate) const FONT_FAMILY: &str = "lucide";
+@@ -94,7 +95,8 @@
+ pub struct Icon {
+   name: IconName,
+   size: Size,
+-  color: Option<ColorName>,
++  pixel_size: Option<Pixels>,
++  color: Option<ColorValue>,
+ }
+ 
+ impl Icon {
+@@ -102,6 +104,7 @@
+     Icon {
+       name,
+       size: Size::Md,
++      pixel_size: None,
+       color: None,
+     }
+   }
+@@ -111,9 +114,16 @@
+     self
+   }
+ 
+-  /// Tint the glyph with a palette color (defaults to inheriting text color).
+-  pub fn color(mut self, color: ColorName) -> Self {
+-    self.color = Some(color);
++  /// Draw at an exact size instead of the theme scale.
++  pub fn pixel_size(mut self, size: Pixels) -> Self {
++    self.pixel_size = Some(size);
++    self
++  }
++
++  /// Tint the glyph with a palette family or an explicit color (defaults to
++  /// inheriting the text color).
++  pub fn color(mut self, color: impl Into<ColorValue>) -> Self {
++    self.color = Some(color.into());
+     self
+   }
+ 
+@@ -132,10 +142,11 @@
+   fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+     ensure_font(cx);
+     let t = theme(cx);
+-    let tint = self.color.map(|c| t.color(c, t.primary_shade()).hsla());
+-    let size = px(self.glyph_px());
++    let tint = self.color.map(|c| c.accent(t));
++    let size = self.pixel_size.unwrap_or_else(|| px(self.glyph_px()));
+     let mut el = div()
+       .flex()
++      .flex_none()
+       .items_center()
+       .justify_center()
+       .font_family(FONT_FAMILY)

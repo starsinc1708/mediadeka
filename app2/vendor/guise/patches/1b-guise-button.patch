@@ -1,0 +1,117 @@
+--- a/app2/vendor/guise/src/button.rs
++++ b/app2/vendor/guise/src/button.rs
+@@ -2,13 +2,21 @@
+ //! colors, and sizes.
+ 
+ use gpui::prelude::*;
+-use gpui::{div, px, App, ClickEvent, ElementId, FontWeight, IntoElement, SharedString, Window};
++use std::rc::Rc;
++
++use gpui::{
++  div, hsla, px, AccessibleAction, App, ClickEvent, ElementId, FocusHandle, FontWeight,
++  IntoElement, Role, SharedString, Window,
++};
+ 
+ use crate::devtools::Probed;
+ use crate::input::ClickHandler;
+ use crate::style::{surface, ColorValue, Variant};
+ use crate::theme::{theme, Size};
+ 
++/// A click handler shared by the pointer and the accessibility Click action.
++type SharedClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
++
+ /// A clickable button.
+ #[derive(IntoElement)]
+ pub struct Button {
+@@ -23,6 +31,9 @@
+   left_section: Option<gpui::AnyElement>,
+   right_section: Option<gpui::AnyElement>,
+   on_click: Option<ClickHandler>,
++  accessible_name: Option<SharedString>,
++  tab_order: isize,
++  focus_handle: Option<FocusHandle>,
+ }
+ 
+ impl Button {
+@@ -39,9 +50,30 @@
+       left_section: None,
+       right_section: None,
+       on_click: None,
++      accessible_name: None,
++      tab_order: 0,
++      focus_handle: None,
+     }
+   }
+ 
++  /// Name announced by screen readers when it differs from the visible label.
++  pub fn accessible_name(mut self, name: impl Into<SharedString>) -> Self {
++    self.accessible_name = Some(name.into());
++    self
++  }
++
++  /// Position in the window tab order. `0` keeps document order.
++  pub fn tab_order(mut self, order: isize) -> Self {
++    self.tab_order = order;
++    self
++  }
++
++  /// Focus through a handle the caller owns, so it can move focus back here.
++  pub fn track_focus(mut self, handle: &FocusHandle) -> Self {
++    self.focus_handle = Some(handle.clone());
++    self
++  }
++
+   pub fn variant(mut self, variant: Variant) -> Self {
+     self.variant = variant;
+     self
+@@ -113,9 +145,14 @@
+     let (height, pad_x, font) = self.metrics();
+     let radius = t.radius(self.radius.unwrap_or(t.default_radius));
+     let focus = t.primary().hsla();
++    let automation_id = self.id.to_string();
++    let name = self.accessible_name.unwrap_or_else(|| self.label.clone());
+ 
+     let mut el = div()
+       .id(self.id)
++      .accessibility_id(automation_id)
++      .role(Role::Button)
++      .aria_label(name)
+       .flex()
+       .items_center()
+       .justify_center()
+@@ -127,12 +164,15 @@
+       .text_color(s.fg)
+       .text_size(px(font))
+       .font_weight(FontWeight::SEMIBOLD)
+-      .tab_index(0)
+-      .focus(move |style| style.border_2().border_color(focus))
++      .tab_index(self.tab_order)
++      // A constant 1px border keeps the keyboard ring from shifting layout.
++      .border_1()
++      .border_color(s.border.unwrap_or(hsla(0.0, 0.0, 0.0, 0.0)))
++      .focus_visible(move |style| style.border_color(focus))
+       .on_key_down(crate::input::handle_tab);
+ 
+-    if let Some(border) = s.border {
+-      el = el.border_1().border_color(border);
++    if let Some(handle) = &self.focus_handle {
++      el = el.track_focus(handle);
+     }
+     if self.full_width {
+       el = el.w_full();
+@@ -151,7 +191,14 @@
+       let hover_bg = s.bg_hover;
+       el = el.hover(move |st| st.bg(hover_bg));
+       if let Some(handler) = self.on_click {
+-        el = el.on_click(handler);
++        // Screen readers press the button through the accessibility Click action.
++        let handler: SharedClickHandler = Rc::from(handler);
++        let accessible = Rc::clone(&handler);
++        el = el
++          .on_click(move |event, window, cx| handler(event, window, cx))
++          .on_a11y_action(AccessibleAction::Click, move |_, window, cx| {
++            accessible(&ClickEvent::default(), window, cx)
++          });
+       }
+       el
+     };

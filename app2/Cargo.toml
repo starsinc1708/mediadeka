@@ -1,0 +1,65 @@
+[package]
+name = "mediadeka"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+async-channel = "2"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false }
+getrandom = "0.3"
+gpui = { git = "https://github.com/sonorahq/gpui", rev = "17c64aee9228a133d05914487a487676364b299e", default-features = false, features = ["profiler"] }
+gpui_platform = { git = "https://github.com/sonorahq/gpui", rev = "17c64aee9228a133d05914487a487676364b299e", default-features = false }
+guise = { package = "guise-ui", path = "vendor/guise", default-features = false }
+hmac = "0.12"
+http-body-util = "0.1"
+httpdate = "1.0.3"
+icu_normalizer = { version = "2.4", default-features = false, features = ["compiled_data"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+librespot-core = { git = "https://github.com/sonorahq/librespot", rev = "c3bbdf7faca8b6e36a9fdc6ba3e8b8923e89b893", default-features = false, features = ["rustls-tls-native-roots"] }
+librespot-protocol = { git = "https://github.com/sonorahq/librespot", rev = "c3bbdf7faca8b6e36a9fdc6ba3e8b8923e89b893" }
+md-5 = "0.10"
+lofty = "0.25.5"
+raw-window-handle = "0.6"
+protobuf = "3"
+roxmltree = "0.21"
+rusqlite = { version = "0.43", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde-saphyr = { version = "2.1", default-features = false, features = ["deserialize"] }
+sha1 = "0.10"
+sha2 = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["io-util", "net", "rt", "sync", "time"] }
+tungstenite = { version = "0.28", default-features = false, features = ["handshake"] }
+ureq = { version = "3.5.2", features = ["json"] }
+url = "2"
+
+[target.'cfg(windows)'.dependencies]
+wasapi = "0.27.0"
+windows-core = "0.62.2"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Graphics_Gdi", "Win32_Security_Credentials", "Win32_Security_Cryptography", "Win32_Security_Cryptography_Catalog", "Win32_Security_Cryptography_Sip", "Win32_Security_WinTrust", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Performance", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_UI_Accessibility", "Win32_UI_WindowsAndMessaging"] }
+webview2-com = "0.39.1"
+wry = { version = "0.57.3", default-features = false }
+zip = { version = "9.8.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[build-dependencies]
+embed-resource = "3"
+resvg = { version = "0.46", default-features = false }
+
+[features]
+capture = ["gpui_platform/test-support"]
+fluid-glass-default = []
+
+[[example]]
+name = "capture-window"
+path = "examples/capture_window.rs"
+required-features = ["capture"]
+
+[profile.dev]
+debug = 0
+
+[workspace]
+members = [".", "vendor/guise"]
+default-members = ["."]

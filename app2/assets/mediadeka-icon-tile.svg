@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <defs>
+    <radialGradient id="graphite" cx="17%" cy="4%" r="108%">
+      <stop stop-color="#3d3e48"/>
+      <stop offset=".51" stop-color="#23242d"/>
+      <stop offset="1" stop-color="#17181e"/>
+    </radialGradient>
+    <linearGradient id="rim" x2=".78" y2="1">
+      <stop stop-color="#7d808e"/>
+      <stop offset=".48" stop-color="#454651"/>
+      <stop offset="1" stop-color="#30313a"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="92" height="92" rx="22" fill="url(#graphite)"
+    stroke="url(#rim)" stroke-width="1.3"/>
+</svg>

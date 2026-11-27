@@ -1,0 +1,28 @@
+[package]
+name = "guise-ui"
+version = "1.11.4"
+edition = "2021"
+license = "MIT"
+authors = ["Wess Cope <opensource@wess.io>"]
+repository = "https://github.com/wess/guise"
+description = "Guise 9ad9588 ported to the Sonora GPUI revision used by Mediadeka."
+publish = false
+
+[lib]
+name = "guise"
+
+[features]
+default = []
+treesitter = ["dep:tree-sitter", "dep:tree-sitter-highlight"]
+
+[dependencies]
+gpui = { git = "https://github.com/sonorahq/gpui", rev = "17c64aee9228a133d05914487a487676364b299e", default-features = false }
+image = { version = "0.25", default-features = false }
+tree-sitter = { version = "0.25", optional = true }
+tree-sitter-highlight = { version = "0.25", optional = true }
+
+[dev-dependencies]
+gpui = { git = "https://github.com/sonorahq/gpui", rev = "17c64aee9228a133d05914487a487676364b299e", default-features = false, features = ["test-support"] }
+tree-sitter = "0.25"
+tree-sitter-highlight = "0.25"
+tree-sitter-rust = "0.24"

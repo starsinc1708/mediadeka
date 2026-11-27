@@ -1,0 +1,10 @@
+/dist/
+/app2/target/
+/v2-docs/
+/.env
+/.env.*
+!/.env.example
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.log
