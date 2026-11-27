@@ -43,3 +43,5 @@
 | Подключения и совместное прослушивание | Spotify Connect, OpenSubsonic, Apple Music, TIDAL, Deezer и сессии по приглашению. | [#12](https://github.com/starsinc1708/mediadeka/issues/12) |
 | Тексты песен | Настройки шрифта, романизация и поиск через lrc.red. | [#13](https://github.com/starsinc1708/mediadeka/issues/13) |
 | Языки интерфейса | Английский перевод, выбор языка и ресурсы для новых переводов. | [#14](https://github.com/starsinc1708/mediadeka/issues/14) |
+| Воспроизведение без цензуры | Версии без запикивания в Яндекс Музыке по сопоставлениям FckCensor. | [#16](https://github.com/starsinc1708/mediadeka/issues/16) |
+| Антислоп | Фильтр ИИ-треков в рекомендациях и автоматической очереди. | [#17](https://github.com/starsinc1708/mediadeka/issues/17) |
