@@ -167,7 +167,6 @@ fn large_local_playlist_survives_restart_with_order_and_duplicate_occurrences() 
     let directory = tempfile::tempdir().unwrap();
     let track = directory.path().join("Музыка.wav");
     write_wave(&track);
-    let missing = directory.path().join("missing.wav");
     let list = directory.path().join("Mix.m3u8");
     fs::write(
         &list,
@@ -202,7 +201,14 @@ fn large_local_playlist_survives_restart_with_order_and_duplicate_occurrences() 
     assert_eq!(a, &playlist.tracks[9999]);
     assert_eq!(b.title, "Off-line track");
     assert_eq!(b.duration, Some(12));
-    assert_eq!(b.media, Some(Media::File(missing)));
+    let Some(Media::File(path)) = &b.media else {
+        panic!("expected a local path for the missing track");
+    };
+    assert!(path.is_absolute() && path.ends_with("missing.wav"));
+    assert_eq!(
+        path.parent().unwrap().canonicalize().unwrap(),
+        directory.path().canonicalize().unwrap()
+    );
     store
         .set_track_favorite(FavoriteScope::Local, &a.id, true, &AtomicBool::new(false))
         .unwrap();
