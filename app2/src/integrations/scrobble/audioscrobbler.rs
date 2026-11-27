@@ -1,4 +1,3 @@
-
 mod callback;
 
 use std::sync::atomic::AtomicBool;

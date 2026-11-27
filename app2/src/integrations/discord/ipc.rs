@@ -1,4 +1,3 @@
-
 use std::{io, thread, time::Duration};
 
 use serde_json::{Value, json};

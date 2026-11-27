@@ -1,5 +1,3 @@
-
-
 use gpui::{
     AppContext as _, Context, Div, Entity, FocusHandle, Role, Stateful, Toggled, Window, div,
     prelude::*, px,
